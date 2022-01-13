@@ -35,6 +35,36 @@ Apriltag_model::Apriltag_model(std::string famname, double decimate, double blur
     td->nthreads = threads_num;
     td->debug = 0;
     td->refine_edges = refine_edges;
+
+
+    cv::Mat intrisicMat(3, 3, cv::DataType<float>::type); // Intrisic matrix
+    intrisicMat.at<float>(0, 0) = 3801.9172357035968;
+    intrisicMat.at<float>(1, 0) = 0;
+    intrisicMat.at<float>(2, 0) = 0;
+
+    intrisicMat.at<float>(0, 1) = 0;
+    intrisicMat.at<float>(1, 1) = 3790.1487533583263;
+    intrisicMat.at<float>(2, 1) = 0;
+
+    intrisicMat.at<float>(0, 2) = 1859.3812994964376;
+    intrisicMat.at<float>(1, 2) = 1028.2183378519671;
+    intrisicMat.at<float>(2, 2) = 1;
+    this->intrisicMat=intrisicMat;
+
+    cv::Mat distCoeffs(5, 1, cv::DataType<float>::type);   // Distortion vector
+//    distCoeffs.at<float>(0) = 0.01357555;
+//    distCoeffs.at<float>(1) = 0.25292517;
+//    distCoeffs.at<float>(2) = 0.00191167;
+//    distCoeffs.at<float>(3) = -0.01010199;
+//    distCoeffs.at<float>(4) = -1.62974334;
+    distCoeffs.at<float>(0) = 0;
+    distCoeffs.at<float>(1) = 0;
+    distCoeffs.at<float>(2) = 0;
+    distCoeffs.at<float>(3) = 0;
+    distCoeffs.at<float>(4) = 0;
+    this->distCoeffs=distCoeffs;
+
+
 }
 
 Apriltag_model::~Apriltag_model() {
@@ -70,11 +100,19 @@ void Apriltag_model::run_frame(cv::Mat frame, double tag_size, double fx, double
 
     zarray_t *detections = apriltag_detector_detect(td, &im);
 
+    objectPoints={cv::Point3f(-tag_size/2, -tag_size/2, 0),
+                  cv::Point3f(-tag_size/2, tag_size/2, 0),
+                  cv::Point3f(tag_size/2, tag_size/2, 0),
+                  cv::Point3f(tag_size/2, -tag_size/2, 0),
+                  cv::Point3f(-tag_size/2, -tag_size/2, -tag_size),
+                  cv::Point3f(-tag_size/2, tag_size/2, -tag_size),
+                  cv::Point3f(tag_size/2, tag_size/2, -tag_size),
+                  cv::Point3f(tag_size/2, -tag_size/2, -tag_size)};
+
     // Draw detection outlines
     for (int i = 0; i < zarray_size(detections); i++) {
         apriltag_detection_t *det;
         zarray_get(detections, i, &det);
-
 
 
         line(frame, cv::Point(det->p[0][0], det->p[0][1]),
@@ -108,16 +146,40 @@ void Apriltag_model::run_frame(cv::Mat frame, double tag_size, double fx, double
         {
             apriltag_detection_info_t info;
             info.det = det;
-            info.tagsize = 0.0624;
-            info.fx = 3801.9172357035968;
-            info.fy = 3790.1487533583263;
-            info.cx = 1859.3812994964376;
-            info.cy = 1028.2183378519671;
+            info.tagsize = tag_size;
+            info.fx = fx;
+            info.fy = fy;
+            info.cx = cx;
+            info.cy = cy;
 
 // Then call estimate_tag_pose.
             apriltag_pose_t pose;
             double err = estimate_tag_pose(&info, &pose);
-            std::cout << pose.R->data[0] <<" "<< pose.R->data[1] <<" "<< pose.R->data[2] <<" "<< pose.R->data[3] <<" "<< std::endl;
+
+            cv::Mat rotation_matrix = (cv::Mat_<double>(3, 3) << pose.R->data[0], pose.R->data[1], pose.R->data[2], pose.R->data[3], pose.R->data[4], pose.R->data[5], pose.R->data[6], pose.R->data[7], pose.R->data[8]);
+            cv::Mat rVec;
+            cv::Rodrigues(rotation_matrix, rVec);
+
+            cv::Mat tVec(3, 1, cv::DataType<float>::type); // Translation vector
+            tVec.at<float>(0) = (float)pose.t->data[0];
+            tVec.at<float>(1) = (float)pose.t->data[1];
+            tVec.at<float>(2) = (float)pose.t->data[2];
+
+
+            std::vector<cv::Point2f> projectedPoints;
+            cv::projectPoints(objectPoints, rVec, tVec, intrisicMat, distCoeffs, projectedPoints);
+
+            for (int i =0;i<4;i++)
+            {
+                cv::line(frame, projectedPoints[i], projectedPoints[i+4], cv::Scalar(255 ,0,0), 3);
+            }
+            std::vector<std::vector<cv::Point>> draw_bottom={{projectedPoints[0],projectedPoints[1],projectedPoints[2], projectedPoints[3]}};
+            std::vector<std::vector<cv::Point>> draw_top={{projectedPoints[4],projectedPoints[5],projectedPoints[6], projectedPoints[7]}};
+
+            cv::drawContours(frame, draw_bottom, -1, cv::Scalar(0, 0, 255), 3);
+
+            cv::drawContours(frame, draw_top, -1, cv::Scalar(255, 192,0), -1);
+
         }
     }
     apriltag_detections_destroy(detections);

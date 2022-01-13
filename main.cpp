@@ -13,7 +13,7 @@ int main(int argc, char *argv[])
     Apriltag_model apriltag_model(famname);
     cv::Mat frame, resize_frame;
 
-    cv::VideoCapture cap("../test.mp4");
+    cv::VideoCapture cap("../video2.mp4");
     cv::VideoWriter writer("../result.mp4", cv::VideoWriter::fourcc('m','p','4','v'), 30, cv::Size(cap.get(cv::CAP_PROP_FRAME_WIDTH), cap.get(cv::CAP_PROP_FRAME_HEIGHT)), true);
 
     for (int i =0; i<cap.get(cv::CAP_PROP_FRAME_COUNT); i++)

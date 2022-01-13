@@ -28,8 +28,11 @@ private:
     apriltag_detector_t *td;
     apriltag_family_t *tf = NULL;
     std::string famname;
+    cv::Mat intrisicMat; // Intrisic matrix
+    cv::Mat distCoeffs;   // Distortion vector
+    std::vector<cv::Point3f> objectPoints;
 public:
-    Apriltag_model(std::string famname, double decimate=2.0, double blur=0.0, int threads_num = 4, bool refine_edges=true);
+    Apriltag_model(std::string famname, double decimate=1.0, double blur=0.0, int threads_num = 4, bool refine_edges=true);
     ~Apriltag_model();
     void run_frame(cv::Mat frame, double tag_size,double fx, double fy, double cx, double cy, bool pose_mea);
 
